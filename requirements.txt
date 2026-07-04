@@ -7,5 +7,4 @@ plotly
 openpyxl
 reportlab
 SpeechRecognition
-PyAudio
 fpdf
