@@ -1,0 +1,11 @@
+streamlit
+google-genai
+python-dotenv
+Pillow
+pandas
+plotly
+openpyxl
+reportlab
+SpeechRecognition
+PyAudio
+fpdf
