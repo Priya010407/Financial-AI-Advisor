@@ -1,20 +1,23 @@
 import json
 import os
 import re
+import streamlit as st
 from dotenv import load_dotenv
 from google import genai
 from PIL import Image
 
 load_dotenv()
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
+api_key = st.secrets.get(
+    "GEMINI_API_KEY",
+    os.getenv("GEMINI_API_KEY")
 )
 
+client = genai.Client(api_key=api_key)
 
 def clean_amount(value):
     """
-    Convert Gemini amount into float safely.
+    Convert Gemini amount into float safely
     """
 
     try:
