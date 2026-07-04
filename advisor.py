@@ -1,16 +1,16 @@
-from google import genai
+import streamlit as st
 from dotenv import load_dotenv
+from google import genai
 import os
 
 load_dotenv()
 
-api_key = st.secrets.get(
-    "GEMINI_API_KEY",
-    os.getenv("GEMINI_API_KEY")
-)
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    api_key = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=api_key)
-
 
 def get_advice(merchant, category, amount, payment_method):
 
