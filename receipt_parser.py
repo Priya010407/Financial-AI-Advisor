@@ -8,18 +8,25 @@ from PIL import Image
 
 load_dotenv()
 
-# Get API key from Streamlit Secrets first, then .env
-if "GEMINI_API_KEY" in st.secrets:
+# -------------------------------
+# GEMINI API KEY
+# -------------------------------
+
+api_key = None
+
+try:
     api_key = st.secrets["GEMINI_API_KEY"]
-else:
+except:
     api_key = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=api_key)
 
+
+# -------------------------------
+# CLEAN AMOUNT
+# -------------------------------
+
 def clean_amount(value):
-    """
-    Convert Gemini amount into float safely
-    """
 
     try:
 
@@ -32,6 +39,7 @@ def clean_amount(value):
         value = value.replace("₹", "")
         value = value.replace("Rs.", "")
         value = value.replace("INR", "")
+        value = value.strip()
 
         match = re.search(r"\d+(\.\d+)?", value)
 
@@ -44,6 +52,10 @@ def clean_amount(value):
     return 0.0
 
 
+# -------------------------------
+# PARSE RECEIPT
+# -------------------------------
+
 def parse_receipt(uploaded_file):
 
     try:
@@ -51,33 +63,55 @@ def parse_receipt(uploaded_file):
         image = Image.open(uploaded_file)
 
         prompt = """
-You are an expert receipt analyzer.
+You are an expert AI receipt analyzer.
 
-Read this receipt or UPI payment screenshot carefully.
+The image may be:
 
-Return ONLY JSON.
+- Google Pay
+- PhonePe
+- Paytm
+- Amazon Pay
+- Bank Receipt
+- Shopping Receipt
+- Restaurant Bill
+- Grocery Bill
+
+Return ONLY valid JSON.
 
 {
-"receipt_type":"",
 "merchant":"",
 "amount":0,
 "category":"",
 "date":"",
 "payment_method":"",
+"receipt_type":"",
 "currency":"INR",
 "confidence":95
 }
 
-IMPORTANT:
+IMPORTANT RULES
 
-• Amount = FINAL PAID AMOUNT ONLY
-• Never return transaction id
-• Never return UPI id
-• Never return account number
-• Never return balance
-• Never combine digits
-• If amount is ₹521 return exactly 521
-• Category:
+1. Amount MUST be FINAL PAID AMOUNT ONLY.
+2. Ignore:
+- UPI ID
+- Transaction ID
+- Reference Number
+- Bank Balance
+- Cashback
+- Rewards
+- Phone Numbers
+- Account Numbers
+3. Never combine digits.
+4. Never guess.
+5. Merchant should be business/shop name only.
+6. Currency must be INR.
+7. Payment Method:
+UPI
+Cash
+Card
+Net Banking
+Wallet
+8. Categories:
 Food & Dining
 Shopping
 Groceries
@@ -87,7 +121,7 @@ Entertainment
 Utilities
 Other
 
-Return JSON only.
+Return ONLY JSON.
 """
 
         response = client.models.generate_content(
@@ -101,41 +135,94 @@ Return JSON only.
         text = response.text.strip()
 
         if text.startswith("```json"):
-            text = text.replace("```json", "").replace("```", "").strip()
+            text = text.replace("```json", "")
+            text = text.replace("```", "").strip()
 
         elif text.startswith("```"):
             text = text.replace("```", "").strip()
 
         data = json.loads(text)
 
-        data["amount"] = clean_amount(
+        amount = clean_amount(
             data.get("amount", 0)
         )
 
-        if data["merchant"] == "":
-            data["merchant"] = "Unknown"
+        data["amount"] = amount
 
-        if data["category"] == "":
-            data["category"] = "Other"
+        if amount == 0:
 
-        if data["payment_method"] == "":
-            data["payment_method"] = "Unknown"
+            # fallback extraction
+            numbers = re.findall(
+                r"\d+\.\d+|\d+",
+                text
+            )
 
-        if data["currency"] == "":
-            data["currency"] = "INR"
+            if numbers:
+
+                try:
+                    data["amount"] = max(
+                        [float(x) for x in numbers]
+                    )
+                except:
+                    pass
+
+        data.setdefault(
+            "merchant",
+            "Unknown"
+        )
+
+        data.setdefault(
+            "category",
+            "Other"
+        )
+
+        data.setdefault(
+            "date",
+            ""
+        )
+
+        data.setdefault(
+            "payment_method",
+            "UPI"
+        )
+
+        data.setdefault(
+            "receipt_type",
+            "Digital Payment"
+        )
+
+        data.setdefault(
+            "currency",
+            "INR"
+        )
+
+        data.setdefault(
+            "confidence",
+            90
+        )
 
         return data
 
     except Exception as e:
 
         return {
-            "receipt_type": "Other",
+
             "merchant": "Unknown",
+
             "amount": 0.0,
+
             "category": "Other",
+
             "date": "",
+
             "payment_method": "Unknown",
+
+            "receipt_type": "Unknown",
+
             "currency": "INR",
+
             "confidence": 0,
+
             "error": str(e)
+
         }

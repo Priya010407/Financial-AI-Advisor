@@ -4,18 +4,35 @@ import pandas as pd
 DB_NAME = "expenses.db"
 
 
-# -------------------------------
-# CREATE DATABASE
-# -------------------------------
+# --------------------------------------------------
+# DATABASE
+# --------------------------------------------------
+
+def get_connection():
+    return sqlite3.connect(DB_NAME)
+
 
 def create_database():
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
 
+    # Users Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Expenses Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS expenses(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
         merchant TEXT,
         amount REAL,
         category TEXT,
@@ -25,17 +42,8 @@ def create_database():
         currency TEXT,
         confidence INTEGER,
         advice TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        email TEXT UNIQUE,
-        password TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
 
@@ -43,11 +51,12 @@ def create_database():
     conn.close()
 
 
-# -------------------------------
+# --------------------------------------------------
 # SAVE EXPENSE
-# -------------------------------
+# --------------------------------------------------
 
 def save_expense(
+    user_id,
     merchant,
     amount,
     category,
@@ -59,11 +68,12 @@ def save_expense(
     advice
 ):
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
     INSERT INTO expenses(
+        user_id,
         merchant,
         amount,
         category,
@@ -74,16 +84,17 @@ def save_expense(
         confidence,
         advice
     )
-    VALUES(?,?,?,?,?,?,?,?,?)
+    VALUES(?,?,?,?,?,?,?,?,?,?)
     """,(
+        user_id,
         merchant,
-        amount,
+        float(amount),
         category,
         receipt_date,
         payment_method,
         receipt_type,
         currency,
-        confidence,
+        int(confidence),
         advice
     ))
 
@@ -91,21 +102,21 @@ def save_expense(
     conn.close()
 
 
-# -------------------------------
-# GET EXPENSES (Tuple)
-# -------------------------------
+# --------------------------------------------------
+# GET EXPENSES
+# --------------------------------------------------
 
-def get_expenses():
+def get_expenses(user_id):
 
-    conn = sqlite3.connect(DB_NAME)
-
+    conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
     SELECT *
     FROM expenses
+    WHERE user_id=?
     ORDER BY id DESC
-    """)
+    """,(user_id,))
 
     data = cursor.fetchall()
 
@@ -114,17 +125,23 @@ def get_expenses():
     return data
 
 
-# -------------------------------
-# GET DATAFRAME
-# -------------------------------
+# --------------------------------------------------
+# DATAFRAME
+# --------------------------------------------------
 
-def get_expenses_df():
+def get_expenses_df(user_id):
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
 
     df = pd.read_sql_query(
-        "SELECT * FROM expenses",
-        conn
+        """
+        SELECT *
+        FROM expenses
+        WHERE user_id=?
+        ORDER BY id DESC
+        """,
+        conn,
+        params=(user_id,)
     )
 
     conn.close()
@@ -132,42 +149,37 @@ def get_expenses_df():
     return df
 
 
-# -------------------------------
-# DELETE ONE EXPENSE
-# -------------------------------
+# --------------------------------------------------
+# DELETE
+# --------------------------------------------------
 
-def delete_expense(expense_id):
+def delete_expense(user_id, expense_id):
 
-    conn = sqlite3.connect(DB_NAME)
-
+    conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "DELETE FROM expenses WHERE id=?",
-        (expense_id,)
-    )
+    cursor.execute("""
+    DELETE FROM expenses
+    WHERE id=? AND user_id=?
+    """,(expense_id,user_id))
 
     conn.commit()
-
     conn.close()
 
 
-# -------------------------------
-# CLEAR ALL
-# -------------------------------
+# --------------------------------------------------
+# CLEAR
+# --------------------------------------------------
 
-def clear_expenses():
+def clear_expenses(user_id):
 
-    conn = sqlite3.connect(DB_NAME)
-
+    conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM expenses")
-
-    cursor.execute(
-        "DELETE FROM sqlite_sequence WHERE name='expenses'"
-    )
+    cursor.execute("""
+    DELETE FROM expenses
+    WHERE user_id=?
+    """,(user_id,))
 
     conn.commit()
-
     conn.close()

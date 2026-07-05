@@ -22,15 +22,15 @@ from voice_parser import (
     parse_voice_expense
 )
 
-# ----------------------------------------------------
+# -------------------------------------
 # DATABASE
-# ----------------------------------------------------
+# -------------------------------------
 
 create_database()
 
-# ----------------------------------------------------
+# -------------------------------------
 # PAGE
-# ----------------------------------------------------
+# -------------------------------------
 
 st.set_page_config(
     page_title="Financial AI Advisor",
@@ -38,9 +38,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# ----------------------------------------------------
+# -------------------------------------
 # SESSION
-# ----------------------------------------------------
+# -------------------------------------
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -48,26 +48,22 @@ if "logged_in" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# ----------------------------------------------------
-# LOGIN
-# ----------------------------------------------------
+# -------------------------------------
+# LOGIN / SIGNUP
+# -------------------------------------
 
 if not st.session_state.logged_in:
 
     st.title("💰 Financial AI Advisor")
 
-    st.caption("AI Powered Expense Tracker")
-
-    login_tab, signup_tab = st.tabs(
+    tab1, tab2 = st.tabs(
         [
             "🔑 Login",
             "📝 Sign Up"
         ]
     )
 
-    # ---------------- LOGIN ----------------
-
-    with login_tab:
+    with tab1:
 
         email = st.text_input(
             "Email",
@@ -82,8 +78,7 @@ if not st.session_state.logged_in:
 
         if st.button(
             "Login",
-            use_container_width=True,
-            key="login_btn"
+            use_container_width=True
         ):
 
             user = auth.login_user(
@@ -102,13 +97,9 @@ if not st.session_state.logged_in:
 
             else:
 
-                st.error(
-                    "Invalid Email or Password"
-                )
+                st.error("Invalid Email or Password")
 
-    # ---------------- SIGNUP ----------------
-
-    with signup_tab:
+    with tab2:
 
         name = st.text_input(
             "Full Name",
@@ -128,8 +119,7 @@ if not st.session_state.logged_in:
 
         if st.button(
             "Create Account",
-            use_container_width=True,
-            key="signup_btn"
+            use_container_width=True
         ):
 
             ok = auth.register_user(
@@ -140,26 +130,29 @@ if not st.session_state.logged_in:
 
             if ok:
 
-                st.success(
-                    "Account Created Successfully"
-                )
+                st.success("Account Created")
 
             else:
 
-                st.error(
-                    "Email already exists"
-                )
+                st.error("Email already exists")
 
     st.stop()
 
-# ----------------------------------------------------
+# -------------------------------------
+# CURRENT USER
+# -------------------------------------
+
+user_id = st.session_state.user[0]
+user_name = st.session_state.user[1]
+
+# -------------------------------------
 # SIDEBAR
-# ----------------------------------------------------
+# -------------------------------------
 
 st.sidebar.title("💰 Financial AI Advisor")
 
 st.sidebar.success(
-    f"Welcome {st.session_state.user[1]}"
+    f"Welcome {user_name}"
 )
 
 menu = st.sidebar.radio(
@@ -186,29 +179,30 @@ menu = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 
-if st.sidebar.button("🗑 Clear History"):
+if st.sidebar.button("🗑 Clear My History"):
 
-    clear_expenses()
+    clear_expenses(user_id)
 
     st.success("History Cleared")
+
+    st.rerun()
 
 if st.sidebar.button("🚪 Logout"):
 
     st.session_state.logged_in = False
-
     st.session_state.user = None
 
     st.rerun()
 
-# ----------------------------------------------------
-# LOAD DATA
-# ----------------------------------------------------
+# -------------------------------------
+# LOAD USER DATA ONLY
+# -------------------------------------
 
-df = get_expenses_df()
+df = get_expenses_df(user_id)
 
-# ----------------------------------------------------
+# -------------------------------------
 # DASHBOARD
-# ----------------------------------------------------
+# -------------------------------------
 
 if menu == "🏠 Dashboard":
 
@@ -228,7 +222,7 @@ if menu == "🏠 Dashboard":
 
         transactions = len(df)
 
-        c1, c2, c3, c4 = st.columns(4)
+        c1,c2,c3,c4 = st.columns(4)
 
         c1.metric(
             "Total Expense",
@@ -241,7 +235,7 @@ if menu == "🏠 Dashboard":
         )
 
         c3.metric(
-            "Highest Expense",
+            "Highest",
             f"₹{highest:.2f}"
         )
 
@@ -252,49 +246,21 @@ if menu == "🏠 Dashboard":
 
         st.divider()
 
-        st.subheader("Budget Status")
-
         category_df = (
-
             df.groupby("category")["amount"]
-
             .sum()
-
             .reset_index()
-
         )
-
-        for _, row in category_df.iterrows():
-
-            limit = get_budget(
-                row["category"]
-            )
-
-            st.write(
-                f"**{row['category']}**"
-            )
-
-            st.progress(
-                min(row["amount"]/limit,1.0)
-            )
-
-            st.caption(
-                f"₹{row['amount']:.2f} / ₹{limit}"
-            )
-
-        st.divider()
 
         col1,col2 = st.columns(2)
 
         with col1:
 
-            st.subheader("Expense Distribution")
-
             fig = px.pie(
                 category_df,
                 names="category",
                 values="amount",
-                hole=0.4
+                hole=0.45
             )
 
             st.plotly_chart(
@@ -304,17 +270,34 @@ if menu == "🏠 Dashboard":
 
         with col2:
 
-            st.subheader("Category Spending")
-
             fig2 = px.bar(
                 category_df,
                 x="category",
-                y="amount"
+                y="amount",
+                text="amount"
             )
 
             st.plotly_chart(
                 fig2,
                 use_container_width=True
+            )
+
+        st.divider()
+
+        st.subheader("Budget Status")
+
+        for _, row in category_df.iterrows():
+
+            limit = get_budget(row["category"])
+
+            st.write(row["category"])
+
+            st.progress(
+                min(row["amount"]/limit,1.0)
+            )
+
+            st.caption(
+                f"₹{row['amount']:.2f} / ₹{limit}"
             )
 
             # ----------------------------------------------------
@@ -326,20 +309,16 @@ elif menu == "🧾 Receipt Scanner":
     st.title("🧾 AI Receipt Scanner")
 
     uploaded_file = st.file_uploader(
-        "Upload Receipt",
+        "Upload Receipt / GPay Screenshot",
         type=["png", "jpg", "jpeg"]
     )
 
     if uploaded_file:
 
-        col1, col2 = st.columns([1,2])
+        col1, col2 = st.columns([1, 2])
 
         with col1:
-
-            st.image(
-                uploaded_file,
-                use_container_width=True
-            )
+            st.image(uploaded_file, use_container_width=True)
 
         with col2:
 
@@ -347,79 +326,40 @@ elif menu == "🧾 Receipt Scanner":
 
                 receipt = parse_receipt(uploaded_file)
 
-            merchant = receipt.get("merchant","Unknown")
+            merchant = receipt.get("merchant", "Unknown")
 
-            amount = float(
-                receipt.get("amount",0)
-            )
+            try:
+                amount = float(receipt.get("amount", 0))
+            except:
+                amount = 0.0
 
-            category = receipt.get(
-                "category",
-                "Other"
-            )
+            category = receipt.get("category", "Other")
+            receipt_date = receipt.get("date", "")
+            payment_method = receipt.get("payment_method", "UPI")
+            receipt_type = receipt.get("receipt_type", "Other")
+            currency = receipt.get("currency", "INR")
+            confidence = int(receipt.get("confidence", 0))
 
-            receipt_date = receipt.get(
-                "date",
-                ""
-            )
+            st.success("Receipt Analyzed Successfully")
 
-            payment_method = receipt.get(
-                "payment_method",
-                "Unknown"
-            )
+            st.write(f"### 🏪 Merchant : {merchant}")
+            st.write(f"### 💰 Amount : ₹{amount:.2f}")
+            st.write(f"### 📂 Category : {category}")
+            st.write(f"### 💳 Payment : {payment_method}")
+            st.write(f"### 📅 Date : {receipt_date}")
 
-            receipt_type = receipt.get(
-                "receipt_type",
-                "Other"
-            )
-
-            currency = receipt.get(
-                "currency",
-                "INR"
-            )
-
-            confidence = receipt.get(
-                "confidence",
-                0
-            )
-
-            st.success("Receipt Successfully Analyzed")
-
-            st.write("### Receipt Details")
-
-            st.write(f"**Merchant :** {merchant}")
-
-            st.write(f"**Amount : ₹{amount}")
-
-            st.write(f"**Category :** {category}")
-
-            st.write(f"**Date :** {receipt_date}")
-
-            st.write(f"**Payment :** {payment_method}")
-
-            st.write(f"**Receipt Type :** {receipt_type}")
-
-            st.progress(confidence/100)
-
-            st.caption(
-                f"Confidence : {confidence}%"
-            )
+            st.progress(confidence / 100)
 
             advice = get_advice(
-
                 merchant,
-
                 category,
-
                 amount,
-
                 payment_method
-
             )
 
             st.divider()
 
-            st.subheader("🤖 AI Financial Advice")
+            st.subheader("🤖 AI Advice")
 
             st.info(advice)
 
@@ -428,44 +368,32 @@ elif menu == "🧾 Receipt Scanner":
             budget = get_budget(category)
 
             st.metric(
-
                 "Recommended Budget",
-
                 f"₹{budget}"
-
             )
 
             if st.button(
-
                 "💾 Save Expense",
-
                 use_container_width=True
-
             ):
 
                 save_expense(
-
+                    user_id,
                     merchant,
-
                     amount,
-
                     category,
-
                     receipt_date,
-
                     payment_method,
-
                     receipt_type,
-
                     currency,
-
                     confidence,
-
                     advice
-
                 )
 
                 st.success("Expense Saved Successfully")
+
+                st.rerun()
+
 
 # ----------------------------------------------------
 # VOICE EXPENSE
@@ -476,110 +404,83 @@ elif menu == "🎤 Voice Expense":
     st.title("🎤 Voice Expense")
 
     audio_file = st.file_uploader(
-
-        "Upload Voice",
-
+        "Upload WAV File",
         type=["wav"]
-
     )
 
     if audio_file:
 
-        result = transcribe_audio_file(
-
-            audio_file
-
-        )
+        result = transcribe_audio_file(audio_file)
 
         if result["status"] == "success":
 
-            st.success("Voice Recognized")
+            st.success(result["text"])
 
-            st.write(result["text"])
+            expense = parse_voice_expense(result["text"])
 
-            expense = parse_voice_expense(
+            amount = float(expense["amount"])
+            category = expense["category"]
 
-                result["text"]
+            st.metric("Amount", f"₹{amount:.2f}")
 
-            )
-
-            st.divider()
-
-            st.subheader("Detected Expense")
-
-            st.write(
-
-                f"Amount : ₹{expense['amount']}"
-
-            )
-
-            st.write(
-
-                f"Category : {expense['category']}"
-
-            )
+            st.write("Category :", category)
 
             if st.button(
-
                 "Save Voice Expense",
-
                 use_container_width=True
-
             ):
 
-                save_expense(
-
+                advice = get_advice(
                     "Voice Expense",
+                    category,
+                    amount,
+                    "Voice"
+                )
 
-                    expense["amount"],
-
-                    expense["category"],
-
+                save_expense(
+                    user_id,
+                    "Voice Expense",
+                    amount,
+                    category,
                     "",
-
                     "Voice",
-
                     "Voice",
-
                     "INR",
-
                     100,
-
-                    "Added through Voice"
-
+                    advice
                 )
 
                 st.success("Expense Saved")
+
+                st.rerun()
 
         else:
 
             st.error(result["text"])
 
-            # ----------------------------------------------------
-# EXPENSE HISTORY
+
+# ----------------------------------------------------
+# HISTORY
 # ----------------------------------------------------
 
 elif menu == "📋 Expense History":
 
     st.title("📋 Expense History")
 
-    df = get_expenses_df()
+    df = get_expenses_df(user_id)
 
     if df.empty:
 
-        st.warning("No Expenses Found")
+        st.info("No Expenses Found")
 
     else:
 
-        search = st.text_input(
-            "🔍 Search Merchant"
-        )
+        search = st.text_input("🔍 Search Merchant")
 
         if search:
 
             df = df[
-                df["merchant"]
-                .str.contains(
+                df["merchant"].str.contains(
                     search,
                     case=False,
                     na=False
@@ -606,16 +507,16 @@ elif menu == "📋 Expense History":
             use_container_width=True
         ):
 
-            delete_expense(expense_id)
-
-            st.success(
-                "Expense Deleted Successfully"
+            delete_expense(
+                user_id,
+                expense_id
             )
+
+            st.success("Expense Deleted")
 
             st.rerun()
 
-
-# ----------------------------------------------------
+        # ----------------------------------------------------
 # ANALYTICS
 # ----------------------------------------------------
 
@@ -623,15 +524,15 @@ elif menu == "📊 Analytics":
 
     st.title("📊 Expense Analytics")
 
-    df = get_expenses_df()
+    df = get_expenses_df(user_id)
 
     if df.empty:
 
-        st.warning("No Data Available")
+        st.warning("No Expenses Found")
 
     else:
 
-        st.subheader("Category Wise Expenses")
+        st.subheader("Category Wise Spending")
 
         category_df = (
             df.groupby("category")["amount"]
@@ -653,7 +554,21 @@ elif menu == "📊 Analytics":
 
         st.divider()
 
-        st.subheader("Monthly Expense Trend")
+        st.subheader("Expense Distribution")
+
+        pie = px.pie(
+            category_df,
+            names="category",
+            values="amount",
+            hole=0.45
+        )
+
+        st.plotly_chart(
+            pie,
+            use_container_width=True
+        )
+
+        st.divider()
 
         if "receipt_date" in df.columns:
 
@@ -663,21 +578,23 @@ elif menu == "📊 Analytics":
                 .reset_index()
             )
 
-            fig2 = px.line(
-                timeline,
-                x="receipt_date",
-                y="amount",
-                markers=True
-            )
+            if not timeline.empty:
 
-            st.plotly_chart(
-                fig2,
-                use_container_width=True
-            )
+                st.subheader("Expense Timeline")
+
+                fig2 = px.line(
+                    timeline,
+                    x="receipt_date",
+                    y="amount",
+                    markers=True
+                )
+
+                st.plotly_chart(
+                    fig2,
+                    use_container_width=True
+                )
 
         st.divider()
-
-        st.subheader("Top 5 Merchants")
 
         merchant_df = (
             df.groupby("merchant")["amount"]
@@ -688,6 +605,8 @@ elif menu == "📊 Analytics":
             .head(5)
             .reset_index()
         )
+
+        st.subheader("Top 5 Merchants")
 
         fig3 = px.bar(
             merchant_df,
@@ -708,7 +627,7 @@ elif menu == "📊 Analytics":
 
 elif menu == "📤 Export":
 
-    st.title("📤 Export Expenses")
+    st.title("📤 Export Your Expenses")
 
     col1, col2 = st.columns(2)
 
@@ -719,20 +638,15 @@ elif menu == "📤 Export":
             use_container_width=True
         ):
 
-            file = export_to_excel()
+            file = export_to_excel(user_id)
 
             with open(file, "rb") as f:
 
                 st.download_button(
-
                     "⬇ Download Excel",
-
                     data=f,
-
                     file_name="expenses.xlsx",
-
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
                 )
 
     with col2:
@@ -742,20 +656,15 @@ elif menu == "📤 Export":
             use_container_width=True
         ):
 
-            file = export_to_pdf()
+            file = export_to_pdf(user_id)
 
             with open(file, "rb") as f:
 
                 st.download_button(
-
                     "⬇ Download PDF",
-
                     data=f,
-
                     file_name="expenses.pdf",
-
                     mime="application/pdf"
-
                 )
 
 
@@ -766,5 +675,5 @@ elif menu == "📤 Export":
 st.markdown("---")
 
 st.caption(
-    "💰 Financial AI Advisor | Powered by Gemini 2.5 Flash"
+    "💰 Financial AI Advisor | AI Powered Expense Tracker | Gemini 2.5 Flash"
 )

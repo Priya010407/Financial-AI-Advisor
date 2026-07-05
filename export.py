@@ -1,78 +1,143 @@
-import pandas as pd
 import sqlite3
+import pandas as pd
 from fpdf import FPDF
-import os
 
 DB_NAME = "expenses.db"
 
 
-# -------------------------------
-# GET EXPENSE DATA
-# -------------------------------
+# ------------------------------------------
+# EXPORT EXCEL
+# ------------------------------------------
 
-def fetch_expenses():
+def export_to_excel(user_id):
 
     conn = sqlite3.connect(DB_NAME)
 
     df = pd.read_sql_query(
-        "SELECT * FROM expenses ORDER BY id DESC",
-        conn
+        """
+        SELECT
+            merchant,
+            amount,
+            category,
+            receipt_date,
+            payment_method,
+            receipt_type,
+            currency,
+            advice
+        FROM expenses
+        WHERE user_id=?
+        ORDER BY id DESC
+        """,
+        conn,
+        params=(user_id,)
     )
 
     conn.close()
 
-    return df
+    file_name = "expenses.xlsx"
+
+    df.to_excel(
+        file_name,
+        index=False
+    )
+
+    return file_name
 
 
-# -------------------------------
-# EXPORT TO EXCEL
-# -------------------------------
+# ------------------------------------------
+# EXPORT PDF
+# ------------------------------------------
 
-def export_to_excel(filename="expenses.xlsx"):
+def export_to_pdf(user_id):
 
-    df = fetch_expenses()
+    conn = sqlite3.connect(DB_NAME)
 
-    df.to_excel(filename, index=False)
+    cursor = conn.cursor()
 
-    return filename
+    cursor.execute("""
+    SELECT
+        merchant,
+        amount,
+        category,
+        receipt_date
+    FROM expenses
+    WHERE user_id=?
+    ORDER BY id DESC
+    """, (user_id,))
 
+    rows = cursor.fetchall()
 
-# -------------------------------
-# EXPORT TO PDF
-# -------------------------------
-
-def export_to_pdf(filename="expenses.pdf"):
-
-    df = fetch_expenses()
+    conn.close()
 
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
+
     pdf.add_page()
 
-    pdf.set_font("Arial", size=12)
+    pdf.set_font(
+        "Arial",
+        "B",
+        16
+    )
 
-    pdf.cell(200, 10, txt="Financial AI Advisor - Expense Report", ln=True, align="C")
-    pdf.ln(10)
+    pdf.cell(
+        200,
+        10,
+        txt="Financial AI Advisor",
+        ln=True,
+        align="C"
+    )
 
-    for i, row in df.iterrows():
+    pdf.ln(5)
 
-        line = f"{row['merchant']} | {row['amount']} | {row['category']} | {row['receipt_date']}"
+    pdf.set_font(
+        "Arial",
+        "",
+        12
+    )
 
-        pdf.cell(200, 10, txt=line[:90], ln=True)
+    total = 0
 
-    pdf.output(filename)
+    for row in rows:
 
-    return filename
+        merchant = row[0]
+        amount = row[1]
+        category = row[2]
+        date = row[3]
 
+        total += amount
 
-# -------------------------------
-# DELETE ALL EXPORT FILES (OPTIONAL)
-# -------------------------------
+        pdf.multi_cell(
+            0,
+            8,
+            txt=f"""
+Merchant : {merchant}
 
-def clear_exports():
+Amount : ₹{amount:.2f}
 
-    files = ["expenses.xlsx", "expenses.pdf"]
+Category : {category}
 
-    for f in files:
-        if os.path.exists(f):
-            os.remove(f)
+Date : {date}
+-----------------------------------------
+"""
+        )
+
+    pdf.ln(5)
+
+    pdf.set_font(
+        "Arial",
+        "B",
+        14
+    )
+
+    pdf.cell(
+        0,
+        10,
+        txt=f"Total Expense : ₹{total:.2f}",
+        ln=True
+    )
+
+    file_name = "expenses.pdf"
+
+    pdf.output(file_name)
+
+    return file_name

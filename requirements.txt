@@ -5,6 +5,6 @@ Pillow
 pandas
 plotly
 openpyxl
-reportlab
 SpeechRecognition
-fpdf
+reportlab
+fpdf2

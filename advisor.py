@@ -5,12 +5,21 @@ import os
 
 load_dotenv()
 
-if "GEMINI_API_KEY" in st.secrets:
+# -----------------------------------
+# GEMINI API KEY
+# -----------------------------------
+
+try:
     api_key = st.secrets["GEMINI_API_KEY"]
-else:
+except:
     api_key = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=api_key)
+
+
+# -----------------------------------
+# AI ADVICE
+# -----------------------------------
 
 def get_advice(merchant, category, amount, payment_method):
 
@@ -26,33 +35,18 @@ Category: {category}
 Amount: ₹{amount}
 Payment Method: {payment_method}
 
-Write advice for a normal person.
+Write advice in simple English.
 
 Rules:
 
 - Maximum 4 short points.
-- Use very simple English.
 - Use emojis.
 - Mention the amount.
 - Tell whether spending is Good, Average or High.
-- Give one money-saving tip.
-- End with one positive sentence.
-- Never use difficult financial words.
-- Don't use markdown.
-- Don't return JSON.
-
-Example style:
-
-🍔 You spent ₹450 on food.
-
-🟢 Spending Level: Good
-
-💡 Tip:
-Cooking at home a few times a week can save more money.
-
-😊 Keep tracking your expenses. Every small saving matters!
-
-Only return the advice.
+- Give one useful saving tip.
+- End with one motivational sentence.
+- No markdown.
+- No JSON.
 """
 
         response = client.models.generate_content(
@@ -64,55 +58,30 @@ Only return the advice.
 
     except:
 
-        # Offline fallback (works even if Gemini fails)
-
         if amount <= 500:
-
             level = "🟢 Good"
-
         elif amount <= 2000:
-
             level = "🟡 Average"
-
         else:
-
             level = "🔴 High"
 
         tips = {
-
-            "Food & Dining":
-            "🍔 Try cooking at home more often to save money.",
-
-            "Shopping":
-            "🛍 Buy only what you really need and compare prices first.",
-
-            "Groceries":
-            "🛒 Making a shopping list helps avoid unnecessary purchases.",
-
-            "Transportation":
-            "🚗 Using public transport sometimes can reduce travel costs.",
-
-            "Medical":
-            "🏥 Health is important. Keep all medical bills for future reference.",
-
-            "Entertainment":
-            "🎬 Set a monthly entertainment budget to avoid overspending.",
-
-            "Utilities":
-            "💡 Saving electricity and water can lower your monthly bills.",
-
-            "Other":
-            "💰 Track your daily expenses regularly to save more money."
-
+            "Food & Dining": "🍔 Cooking at home a few times a week can save more money.",
+            "Shopping": "🛍 Compare prices before buying and avoid impulse purchases.",
+            "Groceries": "🛒 Prepare a shopping list before visiting the store.",
+            "Transportation": "🚌 Use public transport or carpool when possible.",
+            "Medical": "🏥 Health comes first. Keep medical bills safely.",
+            "Entertainment": "🎬 Set a monthly entertainment budget.",
+            "Utilities": "💡 Save electricity and water to reduce bills.",
+            "Other": "💰 Track every expense to improve your savings."
         }
 
         return f"""
-You spent ₹{amount:.2f} at {merchant}.
+💸 You spent ₹{amount:.2f} at {merchant}.
 
-Spending Level: {level}
+{level} Spending Level
 
-Tip:
-{tips.get(category, tips["Other"])}
+💡 {tips.get(category, tips["Other"])}
 
-Keep tracking your expenses. Small savings become big savings over time.
+😊 Every small saving helps build a better financial future!
 """
