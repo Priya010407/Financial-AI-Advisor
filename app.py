@@ -711,4 +711,3 @@ st.markdown("---")
 st.caption(
     "💰 Financial AI Advisor | AI Powered Expense Tracker | Gemini 2.5 Flash"
 )
-```
