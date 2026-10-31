@@ -1,6 +1,8 @@
+```python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import re
 
 import auth
 
@@ -23,13 +25,7 @@ from voice_parser import (
 )
 
 # -------------------------------------
-# DATABASE
-# -------------------------------------
-
-create_database()
-
-# -------------------------------------
-# PAGE
+# PAGE CONFIG
 # -------------------------------------
 
 st.set_page_config(
@@ -37,6 +33,37 @@ st.set_page_config(
     page_icon="💰",
     layout="wide"
 )
+
+# -------------------------------------
+# DATABASE
+# -------------------------------------
+
+create_database()
+
+# -------------------------------------
+# AMOUNT HELPER
+# -------------------------------------
+
+def clean_amount(value):
+
+    if value is None:
+        return 0.0
+
+    text = str(value)
+
+    text = text.replace(",", "")
+    text = text.replace("₹", "")
+    text = text.replace("INR", "")
+    text = text.replace("Rs.", "")
+    text = text.strip()
+
+    match = re.search(r'\d+(?:\.\d{1,2})?', text)
+
+    if match:
+        return float(match.group())
+
+    return 0.0
+
 
 # -------------------------------------
 # SESSION
@@ -48,6 +75,7 @@ if "logged_in" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = None
 
+
 # -------------------------------------
 # LOGIN / SIGNUP
 # -------------------------------------
@@ -57,10 +85,7 @@ if not st.session_state.logged_in:
     st.title("💰 Financial AI Advisor")
 
     tab1, tab2 = st.tabs(
-        [
-            "🔑 Login",
-            "📝 Sign Up"
-        ]
+        ["🔑 Login", "📝 Sign Up"]
     )
 
     with tab1:
@@ -76,15 +101,9 @@ if not st.session_state.logged_in:
             key="login_password"
         )
 
-        if st.button(
-            "Login",
-            use_container_width=True
-        ):
+        if st.button("Login", use_container_width=True):
 
-            user = auth.login_user(
-                email,
-                password
-            )
+            user = auth.login_user(email, password)
 
             if user:
 
@@ -92,11 +111,9 @@ if not st.session_state.logged_in:
                 st.session_state.user = user
 
                 st.success("Login Successful")
-
                 st.rerun()
 
             else:
-
                 st.error("Invalid Email or Password")
 
     with tab2:
@@ -117,10 +134,7 @@ if not st.session_state.logged_in:
             key="signup_password"
         )
 
-        if st.button(
-            "Create Account",
-            use_container_width=True
-        ):
+        if st.button("Create Account", use_container_width=True):
 
             ok = auth.register_user(
                 name,
@@ -129,14 +143,13 @@ if not st.session_state.logged_in:
             )
 
             if ok:
-
                 st.success("Account Created")
 
             else:
-
                 st.error("Email already exists")
 
     st.stop()
+
 
 # -------------------------------------
 # CURRENT USER
@@ -145,36 +158,25 @@ if not st.session_state.logged_in:
 user_id = st.session_state.user[0]
 user_name = st.session_state.user[1]
 
+
 # -------------------------------------
 # SIDEBAR
 # -------------------------------------
 
 st.sidebar.title("💰 Financial AI Advisor")
 
-st.sidebar.success(
-    f"Welcome {user_name}"
-)
+st.sidebar.success(f"Welcome {user_name}")
 
 menu = st.sidebar.radio(
-
     "Navigation",
-
     [
-
         "🏠 Dashboard",
-
         "🧾 Receipt Scanner",
-
         "🎤 Voice Expense",
-
         "📋 Expense History",
-
         "📊 Analytics",
-
         "📤 Export"
-
     ]
-
 )
 
 st.sidebar.markdown("---")
@@ -184,7 +186,6 @@ if st.sidebar.button("🗑 Clear My History"):
     clear_expenses(user_id)
 
     st.success("History Cleared")
-
     st.rerun()
 
 if st.sidebar.button("🚪 Logout"):
@@ -194,11 +195,13 @@ if st.sidebar.button("🚪 Logout"):
 
     st.rerun()
 
+
 # -------------------------------------
-# LOAD USER DATA ONLY
+# LOAD USER DATA
 # -------------------------------------
 
 df = get_expenses_df(user_id)
+
 
 # -------------------------------------
 # DASHBOARD
@@ -215,34 +218,16 @@ if menu == "🏠 Dashboard":
     else:
 
         total = df["amount"].sum()
-
         highest = df["amount"].max()
-
         average = df["amount"].mean()
-
         transactions = len(df)
 
-        c1,c2,c3,c4 = st.columns(4)
+        c1, c2, c3, c4 = st.columns(4)
 
-        c1.metric(
-            "Total Expense",
-            f"₹{total:.2f}"
-        )
-
-        c2.metric(
-            "Transactions",
-            transactions
-        )
-
-        c3.metric(
-            "Highest",
-            f"₹{highest:.2f}"
-        )
-
-        c4.metric(
-            "Average",
-            f"₹{average:.2f}"
-        )
+        c1.metric("Total Expense", f"₹{total:.2f}")
+        c2.metric("Transactions", transactions)
+        c3.metric("Highest", f"₹{highest:.2f}")
+        c4.metric("Average", f"₹{average:.2f}")
 
         st.divider()
 
@@ -252,7 +237,7 @@ if menu == "🏠 Dashboard":
             .reset_index()
         )
 
-        col1,col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
 
@@ -292,17 +277,20 @@ if menu == "🏠 Dashboard":
 
             st.write(row["category"])
 
-            st.progress(
-                min(row["amount"]/limit,1.0)
-            )
+            if limit and float(limit) > 0:
 
-            st.caption(
-                f"₹{row['amount']:.2f} / ₹{limit}"
-            )
+                st.progress(
+                    min(float(row["amount"]) / float(limit), 1.0)
+                )
 
-            # ----------------------------------------------------
+                st.caption(
+                    f"₹{row['amount']:.2f} / ₹{limit}"
+                )
+
+
+# -------------------------------------
 # RECEIPT SCANNER
-# ----------------------------------------------------
+# -------------------------------------
 
 elif menu == "🧾 Receipt Scanner":
 
@@ -318,7 +306,10 @@ elif menu == "🧾 Receipt Scanner":
         col1, col2 = st.columns([1, 2])
 
         with col1:
-            st.image(uploaded_file, use_container_width=True)
+            st.image(
+                uploaded_file,
+                use_container_width=True
+            )
 
         with col2:
 
@@ -328,76 +319,123 @@ elif menu == "🧾 Receipt Scanner":
 
             merchant = receipt.get("merchant", "Unknown")
 
-            try:
-                amount = float(receipt.get("amount", 0))
-            except:
-                amount = 0.0
+            # Extract detected amount
+            detected_amount = clean_amount(
+                receipt.get("amount", 0)
+            )
 
             category = receipt.get("category", "Other")
             receipt_date = receipt.get("date", "")
             payment_method = receipt.get("payment_method", "UPI")
             receipt_type = receipt.get("receipt_type", "Other")
             currency = receipt.get("currency", "INR")
-            confidence = int(receipt.get("confidence", 0))
+
+            try:
+                confidence = int(receipt.get("confidence", 0))
+            except:
+                confidence = 0
+
+            confidence = max(0, min(confidence, 100))
 
             st.success("Receipt Analyzed Successfully")
 
-            st.write(f"### 🏪 Merchant : {merchant}")
-            st.write(f"### 💰 Amount : ₹{amount:.2f}")
-            st.write(f"### 📂 Category : {category}")
-            st.write(f"### 💳 Payment : {payment_method}")
-            st.write(f"### 📅 Date : {receipt_date}")
+            st.write(f"### 🏪 Merchant: {merchant}")
+
+            # ---------------------------------
+            # AMOUNT CORRECTION
+            # ---------------------------------
+
+            st.write(
+                f"Detected Amount: ₹{detected_amount:.2f}"
+            )
+
+            if detected_amount <= 0:
+
+                st.warning(
+                    "Amount could not be detected correctly. "
+                    "Please enter the transaction amount manually."
+                )
+
+            amount = st.number_input(
+                "💰 Verify / Correct Transaction Amount (₹)",
+                min_value=0.0,
+                value=float(detected_amount),
+                step=1.0,
+                format="%.2f",
+                key="correct_receipt_amount"
+            )
+
+            st.write(f"### 📂 Category: {category}")
+            st.write(f"### 💳 Payment: {payment_method}")
+            st.write(f"### 📅 Date: {receipt_date}")
 
             st.progress(confidence / 100)
 
-            advice = get_advice(
-                merchant,
-                category,
-                amount,
-                payment_method
-            )
+            # ---------------------------------
+            # AI ADVICE
+            # ---------------------------------
 
-            st.divider()
+            if amount > 0:
 
-            st.subheader("🤖 AI Advice")
-
-            st.info(advice)
-
-            st.divider()
-
-            budget = get_budget(category)
-
-            st.metric(
-                "Recommended Budget",
-                f"₹{budget}"
-            )
-
-            if st.button(
-                "💾 Save Expense",
-                use_container_width=True
-            ):
-
-                save_expense(
-                    user_id,
+                advice = get_advice(
                     merchant,
-                    amount,
                     category,
-                    receipt_date,
-                    payment_method,
-                    receipt_type,
-                    currency,
-                    confidence,
-                    advice
+                    amount,
+                    payment_method
                 )
 
-                st.success("Expense Saved Successfully")
+                st.divider()
 
-                st.rerun()
+                st.subheader("🤖 AI Financial Advice")
+
+                st.info(advice)
+
+                # ---------------------------------
+                # BUDGET
+                # ---------------------------------
+
+                budget = get_budget(category)
+
+                st.metric(
+                    "Recommended Budget",
+                    f"₹{budget}"
+                )
+
+                # ---------------------------------
+                # SAVE EXPENSE
+                # ---------------------------------
+
+                if st.button(
+                    "💾 Save Expense",
+                    use_container_width=True
+                ):
+
+                    save_expense(
+                        user_id,
+                        merchant,
+                        amount,
+                        category,
+                        receipt_date,
+                        payment_method,
+                        receipt_type,
+                        currency,
+                        confidence,
+                        advice
+                    )
+
+                    st.success("Expense Saved Successfully")
+                    st.rerun()
+
+            else:
+
+                st.error(
+                    "Please enter a valid transaction amount before saving."
+                )
 
 
-# ----------------------------------------------------
+# -------------------------------------
 # VOICE EXPENSE
-# ----------------------------------------------------
+# -------------------------------------
 
 elif menu == "🎤 Voice Expense":
 
@@ -418,12 +456,12 @@ elif menu == "🎤 Voice Expense":
 
             expense = parse_voice_expense(result["text"])
 
-            amount = float(expense["amount"])
+            amount = clean_amount(expense["amount"])
             category = expense["category"]
 
             st.metric("Amount", f"₹{amount:.2f}")
 
-            st.write("Category :", category)
+            st.write("Category:", category)
 
             if st.button(
                 "Save Voice Expense",
@@ -451,7 +489,6 @@ elif menu == "🎤 Voice Expense":
                 )
 
                 st.success("Expense Saved")
-
                 st.rerun()
 
         else:
@@ -459,9 +496,9 @@ elif menu == "🎤 Voice Expense":
             st.error(result["text"])
 
 
-# ----------------------------------------------------
-# HISTORY
-# ----------------------------------------------------
+# -------------------------------------
+# EXPENSE HISTORY
+# -------------------------------------
 
 elif menu == "📋 Expense History":
 
@@ -513,12 +550,12 @@ elif menu == "📋 Expense History":
             )
 
             st.success("Expense Deleted")
-
             st.rerun()
 
-        # ----------------------------------------------------
+
+# -------------------------------------
 # ANALYTICS
-# ----------------------------------------------------
+# -------------------------------------
 
 elif menu == "📊 Analytics":
 
@@ -599,9 +636,7 @@ elif menu == "📊 Analytics":
         merchant_df = (
             df.groupby("merchant")["amount"]
             .sum()
-            .sort_values(
-                ascending=False
-            )
+            .sort_values(ascending=False)
             .head(5)
             .reset_index()
         )
@@ -621,9 +656,9 @@ elif menu == "📊 Analytics":
         )
 
 
-# ----------------------------------------------------
+# -------------------------------------
 # EXPORT
-# ----------------------------------------------------
+# -------------------------------------
 
 elif menu == "📤 Export":
 
@@ -668,12 +703,13 @@ elif menu == "📤 Export":
                 )
 
 
-# ----------------------------------------------------
+# -------------------------------------
 # FOOTER
-# ----------------------------------------------------
+# -------------------------------------
 
 st.markdown("---")
 
 st.caption(
     "💰 Financial AI Advisor | AI Powered Expense Tracker | Gemini 2.5 Flash"
 )
+```
